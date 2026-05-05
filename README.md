@@ -40,10 +40,37 @@ Inspired by [Riley Walz's viral video](https://x.com/rrwalz) where a meeting cou
 
 1. **[Download Dramatic-Events.dmg](https://github.com/ulvosama/dramatic-events/releases/latest/download/Dramatic-Events.dmg)**
 2. Open the DMG and drag **Dramatic Events** to your Applications folder.
-3. Launch it. Approve the **Calendar access** prompt on first launch.
-4. (Optional) Click the menu-bar icon → **Settings…** → toggle **Open at login**.
+3. **First-launch unblock** (see below) — Apple needs you to confirm once.
+4. Launch the app. Approve the **Calendar access** prompt.
+5. (Optional) Click the menu-bar icon → **Settings…** → toggle **Open at login**.
 
 The app runs hidden — no Dock icon, no window. Look in the top-right of your screen for the menu-bar item.
+
+### First-launch unblock
+
+The first time you open the app you'll see a dialog like:
+
+> "Dramatic Events" Not Opened — Apple could not verify "Dramatic Events" is free of malware…
+
+That's because the app isn't signed with a paid Apple Developer ID. The code is open-source in this repo, so you can read every line yourself. To unblock it, pick **one** of these:
+
+**Option A — Terminal (one line):**
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Dramatic Events.app"
+```
+
+Then open the app normally.
+
+**Option B — System Settings (no Terminal):**
+
+1. Click **Done** on the warning dialog (don't move it to Trash).
+2. Open **System Settings → Privacy & Security**.
+3. Scroll to the **Security** section. You'll see *"Dramatic Events was blocked from use…"* with an **Open Anyway** button.
+4. Click **Open Anyway** → confirm with your password.
+5. Open the app again. A new dialog appears with a real **Open** button — click it.
+
+This is a one-time hoop per Mac.
 
 ## First-run permissions
 
