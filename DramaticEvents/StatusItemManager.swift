@@ -5,6 +5,11 @@ enum AppearanceMode { case normal, urgent, urgentFast, live }
 final class StatusItemManager: NSObject {
 
     private let statusItem: NSStatusItem
+    /// Hosts the SF Symbol so we can drive `addSymbolEffect`. NSStatusItem's
+    /// own `button.image` is rendered cell-side and doesn't support symbol
+    /// effects — we set it to a transparent placeholder of the same size so
+    /// the title still has a leading inset, and overlay this view on top.
+    private let iconView: NSImageView
     private let joinItem: NSMenuItem
     private var joinURL: URL?
     private var mode: AppearanceMode = .normal
@@ -29,15 +34,61 @@ final class StatusItemManager: NSObject {
     /// Dropdown menu entries (e.g. "Join …") show the full title.
     private static let titleCharCap = 20
 
+    private static let iconPointSize: CGFloat = 13
+    /// Slightly bigger than the symbol's typeface size so the symbol's
+    /// natural bounding box (which exceeds its glyph height) fits.
+    private static let iconViewSize: CGFloat = 18
+
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+
+        let cfg = NSImage.SymbolConfiguration(pointSize: Self.iconPointSize, weight: .regular)
+        let symbol = NSImage(
+            systemSymbolName: "antenna.radiowaves.left.and.right",
+            accessibilityDescription: "Dramatic Events")?
+            .withSymbolConfiguration(cfg)
+
+        iconView = NSImageView(image: symbol ?? NSImage())
+        iconView.symbolConfiguration = cfg
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.contentTintColor = .labelColor
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+
         joinItem = NSMenuItem(title: "Join", action: nil, keyEquivalent: "j")
         super.init()
         joinItem.target = self
         joinItem.action = #selector(joinAction)
         joinItem.isHidden = true
         configureMenu()
+        installIconView()
         applyChrome()
+
+        // Showup on app open — animate the icon dropping into place.
+        if #available(macOS 14.0, *) {
+            iconView.addSymbolEffect(.appear.down.byLayer, options: .nonRepeating)
+        }
+    }
+
+    // MARK: – Icon hosting
+
+    private func installIconView() {
+        guard let button = statusItem.button else { return }
+
+        // Reserve horizontal space inside the button for the icon area. The
+        // image itself is fully transparent, so only `iconView` is visible.
+        let placeholder = NSImage(size: NSSize(width: Self.iconViewSize,
+                                               height: Self.iconViewSize),
+                                  flipped: false) { _ in true }
+        button.image = placeholder
+        button.imagePosition = .imageLeft
+
+        button.addSubview(iconView)
+        NSLayoutConstraint.activate([
+            iconView.widthAnchor.constraint(equalToConstant: Self.iconViewSize),
+            iconView.heightAnchor.constraint(equalToConstant: Self.iconViewSize),
+            iconView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            iconView.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 4)
+        ])
     }
 
     // MARK: – Visuals
@@ -51,46 +102,26 @@ final class StatusItemManager: NSObject {
             ? Self.urgentBackground.cgColor
             : NSColor.clear.cgColor
 
-        let cfg = NSImage.SymbolConfiguration(
-            pointSize: hot ? 8 : 13,
-            weight:    hot ? .bold : .regular)
-        let symbolName = hot ? "circle.fill" : "display"
-        guard let base = NSImage(systemSymbolName: symbolName,
-                                 accessibilityDescription: hot ? "Going live" : "Meeting")?
-                                 .withSymbolConfiguration(cfg) else { return }
-
-        if hot {
-            let white = NSImage(size: base.size, flipped: false) { rect in
-                NSColor.white.set()
-                rect.fill()
-                base.draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1.0)
-                return true
-            }
-            white.isTemplate = false
-            button.image = white
-        } else {
-            base.isTemplate = true
-            button.image = base
-        }
-        button.imagePosition = .imageLeft
+        iconView.contentTintColor = hot ? .white : .labelColor
     }
 
     /// Switch between normal / urgent (slow red pulse) / urgentFast (fast red
     /// pulse, used in the final 3 s) / live (solid red, no pulse).
     func setMode(_ newMode: AppearanceMode) {
         guard newMode != mode else { return }
+        let old = mode
         mode = newMode
         applyChrome()
 
         guard let button = statusItem.button else { return }
 
+        // Background pulse on the button layer
         let pulseDuration: Double?
         switch newMode {
         case .urgent:     pulseDuration = 0.9
         case .urgentFast: pulseDuration = 0.35
         case .normal, .live: pulseDuration = nil
         }
-
         button.layer?.removeAnimation(forKey: "pulse")
         if let duration = pulseDuration {
             let anim = CABasicAnimation(keyPath: "opacity")
@@ -103,6 +134,25 @@ final class StatusItemManager: NSObject {
             button.layer?.add(anim, forKey: "pulse")
         } else {
             button.layer?.opacity = 1.0
+        }
+
+        // SF Symbol effects on the icon (macOS 14+).
+        if #available(macOS 14.0, *) {
+            let wasCountingDown = (old == .urgent || old == .urgentFast)
+            let isCountingDown  = (newMode == .urgent || newMode == .urgentFast)
+
+            if !wasCountingDown && isCountingDown {
+                iconView.addSymbolEffect(
+                    .variableColor.iterative.dimInactiveLayers.nonReversing,
+                    options: .repeating)
+            } else if wasCountingDown && !isCountingDown {
+                iconView.removeAllSymbolEffects()
+            }
+
+            // Trigger "appear" again when going live.
+            if newMode == .live && old != .live {
+                iconView.addSymbolEffect(.appear.down.byLayer, options: .nonRepeating)
+            }
         }
     }
 
