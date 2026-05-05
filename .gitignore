@@ -1,0 +1,12 @@
+.DS_Store
+build/
+DramaticEvents/AppIcon.icns
+DramaticEvents/AppIcon.iconset/
+*.dmg
+*.xcodeproj/
+*.xcworkspace/
+.build/
+DerivedData/
+.claude/
+DramaticEvents/bbc_news_theme.mov
+
