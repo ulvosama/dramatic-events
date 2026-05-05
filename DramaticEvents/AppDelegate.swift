@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var currentEvent: EKEvent?
     private var soundStartedForEventID: String?
     private var activityToken: NSObjectProtocol?
+    private var dramaStartTime: Date?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Keep the runloop / timer ticking and audio firing on time even when
@@ -38,6 +39,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     return
                 }
                 self.startTimer()
+                if Settings.shared.startupDramaEnabled {
+                    self.startStartupDrama()
+                }
                 self.refreshEvent()
             }
         }
@@ -78,7 +82,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemManager.setJoin(label: event.title ?? "meeting", url: url)
     }
 
+    // MARK: – Startup drama
+
+    /// Two-phase intro played on launch (after Calendar access is granted)
+    /// to deliver the value of the app immediately:
+    ///   • 0–10 s: "Going live in Ns" — urgent visual + meeting sound.
+    ///   • 10–20 s: "We're live!"     — solid red, no flash.
+    private enum DramaPhase {
+        case countdown(secondsLeft: Int)   // 10, 9, 8, …, 1
+        case live
+    }
+
+    private func startStartupDrama() {
+        dramaStartTime = Date()
+        soundPlayer.playMeetingSound()
+        tick()      // render "Going live in 10s" right away
+    }
+
+    private func dramaPhase() -> DramaPhase? {
+        guard let start = dramaStartTime else { return nil }
+        let elapsed = Date().timeIntervalSince(start)
+        if elapsed < 10 {
+            return .countdown(secondsLeft: max(1, 10 - Int(elapsed)))
+        } else if elapsed < 20 {
+            return .live
+        }
+        return nil
+    }
+
     @objc private func tick() {
+        if dramaStartTime != nil {
+            if let phase = dramaPhase() {
+                switch phase {
+                case .countdown(let s):
+                    statusItemManager.setMode(.urgent)
+                    statusItemManager.showText("Going live in \(s)s")
+                case .live:
+                    statusItemManager.setMode(.live)
+                    statusItemManager.showText("We're live!")
+                }
+                return
+            }
+            // Drama just ended — fall through to the normal calendar UI.
+            dramaStartTime = nil
+            soundPlayer.stop()
+            statusItemManager.setMode(.normal)
+        }
+
         guard let event = currentEvent else {
             statusItemManager.setMode(.normal)
             statusItemManager.showText("No meetings today")

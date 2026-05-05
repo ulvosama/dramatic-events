@@ -19,6 +19,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private let loginCheck   = NSButton(checkboxWithTitle: "Open at login",
                                         target: nil, action: nil)
+    private let dramaCheck   = NSButton(checkboxWithTitle: "Play startup drama",
+                                        target: nil, action: nil)
 
     private let versionLabel = NSTextField(labelWithString: "")
     private let updateLabel  = NSTextField(labelWithString: "Checking for updates…")
@@ -159,6 +161,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         loginCheck.action = #selector(loginToggled)
         stack.addArrangedSubview(loginCheck)
 
+        dramaCheck.target = self
+        dramaCheck.action = #selector(dramaToggled)
+        dramaCheck.toolTip = "Play a 20-second \"Going live\" intro every time the app launches."
+        stack.addArrangedSubview(dramaCheck)
+
         stack.addArrangedSubview(divider())
 
         // — About —
@@ -227,6 +234,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         resetButton.target  = self;  resetButton.action  = #selector(resetMusic)
         previewBtn.target   = self;  previewBtn.action   = #selector(togglePreview)
         updateButton.target = self;  updateButton.action = #selector(updateButtonTapped)
+    }
+
+    @objc private func dramaToggled() {
+        Settings.shared.startupDramaEnabled = (dramaCheck.state == .on)
     }
 
     // MARK: – Sound UI
@@ -336,6 +347,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func refreshLoginUI() {
         loginCheck.state = LoginItemHelper.isEnabled ? .on : .off
+        dramaCheck.state = Settings.shared.startupDramaEnabled ? .on : .off
     }
 
     @objc private func loginToggled() {

@@ -8,8 +8,21 @@ final class Settings {
 
     private let defaults = UserDefaults.standard
     private enum Key {
-        static let soundPath = "soundPath"
-        static let trimStart = "trimStart"
+        static let soundPath     = "soundPath"
+        static let trimStart     = "trimStart"
+        static let startupDrama  = "startupDrama"
+    }
+
+    /// When true, plays a 20-second dramatic sequence ("Going live in 10s…
+    /// We're live!") every time the app launches and Calendar access is granted.
+    /// Defaults to true so first-time users immediately experience the value.
+    var startupDramaEnabled: Bool {
+        get {
+            // First-run default = true.
+            if defaults.object(forKey: Key.startupDrama) == nil { return true }
+            return defaults.bool(forKey: Key.startupDrama)
+        }
+        set { defaults.set(newValue, forKey: Key.startupDrama) }
     }
 
     /// Path to the user-chosen sound. `nil` means "use the bundled default".
