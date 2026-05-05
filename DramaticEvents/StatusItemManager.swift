@@ -1,6 +1,6 @@
 import AppKit
 
-enum AppearanceMode { case normal, urgent, live }
+enum AppearanceMode { case normal, urgent, urgentFast, live }
 
 final class StatusItemManager: NSObject {
 
@@ -75,24 +75,33 @@ final class StatusItemManager: NSObject {
         button.imagePosition = .imageLeft
     }
 
-    /// Switch between normal / urgent (pulsing red) / live (solid red).
+    /// Switch between normal / urgent (slow red pulse) / urgentFast (fast red
+    /// pulse, used in the final 3 s) / live (solid red, no pulse).
     func setMode(_ newMode: AppearanceMode) {
         guard newMode != mode else { return }
         mode = newMode
         applyChrome()
 
         guard let button = statusItem.button else { return }
-        if newMode == .urgent {
+
+        let pulseDuration: Double?
+        switch newMode {
+        case .urgent:     pulseDuration = 0.9
+        case .urgentFast: pulseDuration = 0.35
+        case .normal, .live: pulseDuration = nil
+        }
+
+        button.layer?.removeAnimation(forKey: "pulse")
+        if let duration = pulseDuration {
             let anim = CABasicAnimation(keyPath: "opacity")
             anim.fromValue       = 1.0
             anim.toValue         = 0.45
-            anim.duration        = 0.9
+            anim.duration        = duration
             anim.autoreverses    = true
             anim.repeatCount     = .infinity
             anim.timingFunction  = CAMediaTimingFunction(name: .easeInEaseOut)
             button.layer?.add(anim, forKey: "pulse")
         } else {
-            button.layer?.removeAnimation(forKey: "pulse")
             button.layer?.opacity = 1.0
         }
     }

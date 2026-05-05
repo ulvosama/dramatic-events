@@ -87,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Two-phase intro played on launch (after Calendar access is granted)
     /// to deliver the value of the app immediately:
     ///   • 0–10 s: "Going live in Ns" — urgent visual + meeting sound.
-    ///   • 10–20 s: "We're live!"     — solid red, no flash.
+    ///   • 10–13 s: "We're live!"     — solid red, no flash.
     private enum DramaPhase {
         case countdown(secondsLeft: Int)   // 10, 9, 8, …, 1
         case live
@@ -104,7 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let elapsed = Date().timeIntervalSince(start)
         if elapsed < 10 {
             return .countdown(secondsLeft: max(1, 10 - Int(elapsed)))
-        } else if elapsed < 20 {
+        } else if elapsed < 13 {
             return .live
         }
         return nil
@@ -115,7 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let phase = dramaPhase() {
                 switch phase {
                 case .countdown(let s):
-                    statusItemManager.setMode(.urgent)
+                    statusItemManager.setMode(s <= 3 ? .urgentFast : .urgent)
                     statusItemManager.showText("Going live in \(s)s")
                 case .live:
                     statusItemManager.setMode(.live)
@@ -125,7 +125,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             // Drama just ended — fall through to the normal calendar UI.
             dramaStartTime = nil
-            soundPlayer.stop()
             statusItemManager.setMode(.normal)
         }
 
@@ -141,7 +140,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if interval > 0 {
             // Countdown
             let secondsLeft = Int(interval.rounded(.up))
-            statusItemManager.setMode(secondsLeft <= 10 ? .urgent : .normal)
+            let mode: AppearanceMode
+            if secondsLeft <= 3       { mode = .urgentFast }
+            else if secondsLeft <= 10 { mode = .urgent }
+            else                      { mode = .normal }
+            statusItemManager.setMode(mode)
             statusItemManager.showStructured(
                 title: title,
                 suffix: " in \(formatCountdown(seconds: secondsLeft))")
@@ -153,9 +156,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else if interval >= -60 {
             // Live state — first 60 s of the event. Solid red, no flash.
+            // SoundPlayer's own timer ends playback (lead + tail seconds after
+            // it started), so we no longer call stop() here — that would kill
+            // the +2 s tail of the default sound.
             statusItemManager.setMode(.live)
             statusItemManager.showStructured(title: title, suffix: " is live!")
-            soundPlayer.stop()
         } else {
             // After 1 minute, advance to the next event.
             statusItemManager.setMode(.normal)
