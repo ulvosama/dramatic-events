@@ -62,15 +62,22 @@ final class WelcomeWindowController: NSWindowController, NSWindowDelegate {
             stack.bottomAnchor.constraint(equalTo: content.bottomAnchor)
         ])
 
+        let iconSize: CGFloat = 96
         let iconImage = NSImage(named: "AppIcon")
             ?? NSImage(systemSymbolName: "antenna.radiowaves.left.and.right",
                        accessibilityDescription: nil)
         let iconView = NSImageView(image: iconImage ?? NSImage())
         iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.wantsLayer = true
+        // macOS app icons use a roughly 22.4% corner radius (the squircle ratio).
+        // Apply it as a layer mask so any square source artwork still looks like
+        // a native macOS icon in the welcome window.
+        iconView.layer?.cornerRadius = iconSize * 0.224
+        iconView.layer?.masksToBounds = true
         NSLayoutConstraint.activate([
-            iconView.widthAnchor.constraint(equalToConstant: 96),
-            iconView.heightAnchor.constraint(equalToConstant: 96)
+            iconView.widthAnchor.constraint(equalToConstant: iconSize),
+            iconView.heightAnchor.constraint(equalToConstant: iconSize)
         ])
         stack.addArrangedSubview(iconView)
 
@@ -80,11 +87,9 @@ final class WelcomeWindowController: NSWindowController, NSWindowDelegate {
         stack.addArrangedSubview(title)
 
         let body = NSTextField(wrappingLabelWithString:
-            "Dramatic Events lives in your menu bar and counts down to your next " +
-            "calendar meeting — with a dramatic ten-second sound entrance when it's " +
-            "about to start.\n\n" +
-            "To do that, it needs read-only access to your Calendar. Your events " +
-            "stay on your Mac; nothing is sent anywhere.")
+            "A live countdown to your next meeting, right in your menu bar.\n\n" +
+            "Allow calendar access on the next screen to get started. " +
+            "Everything stays on your Mac.")
         body.alignment = .center
         body.font = NSFont.systemFont(ofSize: 12)
         body.textColor = .secondaryLabelColor

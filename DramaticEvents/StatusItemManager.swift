@@ -11,7 +11,6 @@ final class StatusItemManager: NSObject {
     /// the title still has a leading inset, and overlay this view on top.
     private let iconView: NSImageView
     private let joinItem: NSMenuItem
-    private let skipItem: NSMenuItem
     private let upcomingHeader: NSMenuItem
     private var upcomingRows: [NSMenuItem] = []
     private var upcomingSeparator: NSMenuItem?
@@ -21,8 +20,6 @@ final class StatusItemManager: NSObject {
     var onRefresh: (() -> Void)?
     var onOpenCalendar: (() -> Void)?
     var onOpenSettings: (() -> Void)?
-    /// Called with the new state (`true` = mute the next sound, `false` = un-mute).
-    var onSkipToggled: ((Bool) -> Void)?
 
     private static let urgentBackground = NSColor(
         red:   0xFF / 255.0,
@@ -61,15 +58,11 @@ final class StatusItemManager: NSObject {
         iconView.translatesAutoresizingMaskIntoConstraints = false
 
         joinItem = NSMenuItem(title: "Join", action: nil, keyEquivalent: "j")
-        skipItem = NSMenuItem(title: "Mute next event", action: nil, keyEquivalent: "")
         upcomingHeader = NSMenuItem(title: "Upcoming", action: nil, keyEquivalent: "")
         super.init()
         joinItem.target = self
         joinItem.action = #selector(joinAction)
         joinItem.isHidden = true
-        skipItem.target = self
-        skipItem.action = #selector(skipAction)
-        skipItem.isHidden = true
         upcomingHeader.isEnabled = false
         configureMenu()
         installIconView()
@@ -204,7 +197,6 @@ final class StatusItemManager: NSObject {
         menu.autoenablesItems = false
 
         menu.addItem(joinItem)
-        menu.addItem(skipItem)
         menu.addItem(.separator())
 
         menu.addItem(upcomingHeader)
@@ -247,10 +239,6 @@ final class StatusItemManager: NSObject {
     @objc private func joinAction() {
         if let url = joinURL { NSWorkspace.shared.open(url) }
     }
-    @objc private func skipAction() {
-        skipItem.state = (skipItem.state == .on) ? .off : .on
-        onSkipToggled?(skipItem.state == .on)
-    }
 
     func setJoin(label: String?, url: URL?) {
         if let label = label, let url = url {
@@ -261,19 +249,6 @@ final class StatusItemManager: NSObject {
             joinItem.title = "Join"
             joinItem.isHidden = true
             joinURL = nil
-        }
-    }
-
-    /// Configure the "Mute next event" toggle. Pass `nil` for `label` to hide
-    /// the item (no upcoming event to skip).
-    func setSkip(label: String?, isMuted: Bool) {
-        if let label = label {
-            skipItem.title = "Mute next: \(label)"
-            skipItem.state = isMuted ? .on : .off
-            skipItem.isHidden = false
-        } else {
-            skipItem.isHidden = true
-            skipItem.state = .off
         }
     }
 

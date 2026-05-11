@@ -11,7 +11,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var currentEvent: EKEvent?
     private var soundStartedForEventID: String?
     private var notifiedLiveEventID: String?
-    private var skippedEventID: String?
     private var activityToken: NSObjectProtocol?
     private var dramaStartTime: Date?
 
@@ -30,10 +29,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItemManager.onOpenSettings = {
             SettingsWindowController.shared.show()
-        }
-        statusItemManager.onSkipToggled = { [weak self] muted in
-            guard let self else { return }
-            self.skippedEventID = muted ? self.currentEvent?.eventIdentifier : nil
         }
         SettingsWindowController.shared.onTestDrama = { [weak self] in
             self?.startStartupDrama()
@@ -96,7 +91,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let newEvent = events.first
                 // Reset per-event flags when the current event changes.
                 if newEvent?.eventIdentifier != self.currentEvent?.eventIdentifier {
-                    self.skippedEventID = nil
                     self.notifiedLiveEventID = nil
                 }
                 self.currentEvent = newEvent
@@ -114,15 +108,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItemManager.setJoin(label: event.title ?? "meeting", url: url)
         } else {
             statusItemManager.setJoin(label: nil, url: nil)
-        }
-
-        // Skip toggle
-        if let event = current {
-            statusItemManager.setSkip(
-                label: event.title ?? "meeting",
-                isMuted: skippedEventID == event.eventIdentifier)
-        } else {
-            statusItemManager.setSkip(label: nil, isMuted: false)
         }
 
         // Upcoming list
@@ -197,14 +182,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 title: title,
                 suffix: " in \(formatCountdown(seconds: secondsLeft))")
 
-            // Sound + urgent visual fire together at T-10s. Visual still
-            // fires when the user has muted this event; only the sound is
-            // suppressed (they retain the heads-up).
+            // Sound + urgent visual fire together at T-10s.
             if secondsLeft <= 10, soundStartedForEventID != id {
                 soundStartedForEventID = id
-                if skippedEventID != id {
-                    soundPlayer.playMeetingSound()
-                }
+                soundPlayer.playMeetingSound()
             }
         } else if interval >= -60 {
             // Live state — first 60 s of the event. Solid red, no flash.

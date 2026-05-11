@@ -26,9 +26,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let notifyCheck  = NSButton(checkboxWithTitle: "Show macOS notification when a meeting starts",
                                         target: nil, action: nil)
 
-    private let volumeSlider = NSSlider(value: 1, minValue: 0, maxValue: 1,
-                                        target: nil, action: nil)
-    private let volumeLabel  = NSTextField(labelWithString: "Volume")
+    private let volumeSlider  = NSSlider(value: 1, minValue: 0, maxValue: 1,
+                                         target: nil, action: nil)
+    private let volumeLabel   = NSTextField(labelWithString: "Volume")
+    private let volumePctLabel = NSTextField(labelWithString: "100%")
 
     private let versionLabel = NSTextField(labelWithString: "")
     private let updateLabel  = NSTextField(labelWithString: "Checking for updates…")
@@ -167,12 +168,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         volumeSlider.controlSize = .small
         volumeSlider.target = self
         volumeSlider.action = #selector(volumeChanged)
-        let vRow = NSStackView(views: [volumeLabel, volumeSlider])
+        volumeLabel.font     = NSFont.systemFont(ofSize: 11)
+        volumeLabel.textColor = .secondaryLabelColor
+        volumePctLabel.font     = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        volumePctLabel.textColor = .secondaryLabelColor
+        volumePctLabel.alignment = .right
+        volumePctLabel.widthAnchor.constraint(equalToConstant: 36).isActive = true
+
+        let vRow = NSStackView(views: [volumeLabel, volumeSlider, volumePctLabel])
         vRow.alignment = .centerY
         vRow.spacing = 10
-        volumeLabel.font = NSFont.systemFont(ofSize: 11)
-        volumeLabel.textColor = .secondaryLabelColor
-        let vWidth = volumeSlider.widthAnchor.constraint(equalToConstant: 380)
+        let vWidth = volumeSlider.widthAnchor.constraint(equalToConstant: 340)
         vWidth.priority = .defaultHigh
         vWidth.isActive = true
         stack.addArrangedSubview(vRow)
@@ -288,6 +294,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func volumeChanged() {
         Settings.shared.volume = volumeSlider.doubleValue
+        refreshVolumeLabel()
+    }
+
+    private func refreshVolumeLabel() {
+        volumePctLabel.stringValue = "\(Int((volumeSlider.doubleValue * 100).rounded()))%"
     }
 
     // MARK: – Sound UI
@@ -400,6 +411,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         dramaCheck.state  = Settings.shared.startupDramaEnabled ? .on : .off
         notifyCheck.state = Settings.shared.macOSNotificationsEnabled ? .on : .off
         volumeSlider.doubleValue = Settings.shared.volume
+        refreshVolumeLabel()
     }
 
     @objc private func loginToggled() {
