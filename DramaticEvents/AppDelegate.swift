@@ -110,8 +110,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItemManager.setJoin(label: nil, url: nil)
         }
 
-        // Upcoming list
-        let upcoming = events.map { (title: $0.title ?? "Meeting", start: $0.startDate ?? Date()) }
+        // Upcoming list. Each row carries its event's video link (if any) so
+        // clicking opens it directly.
+        let upcoming = events.map {
+            (title: $0.title ?? "Meeting",
+             start: $0.startDate ?? Date(),
+             joinURL: EventLinkParser.extractURL(from: $0))
+        }
         statusItemManager.setUpcoming(upcoming)
     }
 

@@ -253,7 +253,9 @@ final class StatusItemManager: NSObject {
     }
 
     /// Update the "Upcoming" section. Pass an empty array to hide the section.
-    func setUpcoming(_ events: [(title: String, start: Date)]) {
+    /// Rows whose `joinURL` is non-nil become clickable and open that URL.
+    /// Rows with no link stay informational (dimmed).
+    func setUpcoming(_ events: [(title: String, start: Date, joinURL: URL?)]) {
         guard let menu = statusItem.menu else { return }
 
         // Remove any previous rows we added.
@@ -270,17 +272,26 @@ final class StatusItemManager: NSObject {
         formatter.timeStyle = .short
         formatter.dateStyle = .none
 
-        // Insert new rows immediately after the header.
         guard let headerIndex = menu.items.firstIndex(of: upcomingHeader) else { return }
         for (offset, event) in events.enumerated() {
             let cap = 35
             let displayTitle = event.title.count > cap
                 ? event.title.prefix(cap - 1).trimmingCharacters(in: .whitespaces) + "…"
                 : event.title
-            let row = NSMenuItem(
-                title: "   \(displayTitle) — \(formatter.string(from: event.start))",
-                action: nil, keyEquivalent: "")
-            row.isEnabled = false
+            let title = "   \(displayTitle) — \(formatter.string(from: event.start))"
+
+            let row: NSMenuItem
+            if let url = event.joinURL {
+                row = NSMenuItem(title: title,
+                                 action: #selector(joinFromMenuRow(_:)),
+                                 keyEquivalent: "")
+                row.target = self
+                row.representedObject = url
+                row.toolTip = "Join \(event.title)"
+            } else {
+                row = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                row.isEnabled = false
+            }
             menu.insertItem(row, at: headerIndex + 1 + offset)
             upcomingRows.append(row)
         }
@@ -293,5 +304,11 @@ final class StatusItemManager: NSObject {
             ])
         upcomingHeader.isHidden = false
         upcomingSeparator?.isHidden = false
+    }
+
+    @objc private func joinFromMenuRow(_ sender: NSMenuItem) {
+        if let url = sender.representedObject as? URL {
+            NSWorkspace.shared.open(url)
+        }
     }
 }
