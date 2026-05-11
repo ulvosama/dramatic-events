@@ -268,30 +268,11 @@ final class StatusItemManager: NSObject {
             return
         }
 
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        formatter.dateStyle = .none
-
         guard let headerIndex = menu.items.firstIndex(of: upcomingHeader) else { return }
         for (offset, event) in events.enumerated() {
-            let cap = 35
-            let displayTitle = event.title.count > cap
-                ? event.title.prefix(cap - 1).trimmingCharacters(in: .whitespaces) + "…"
-                : event.title
-            let title = "   \(displayTitle) — \(formatter.string(from: event.start))"
-
-            let row: NSMenuItem
-            if let url = event.joinURL {
-                row = NSMenuItem(title: title,
-                                 action: #selector(joinFromMenuRow(_:)),
-                                 keyEquivalent: "")
-                row.target = self
-                row.representedObject = url
-                row.toolTip = "Join \(event.title)"
-            } else {
-                row = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-                row.isEnabled = false
-            }
+            let row = makeUpcomingRow(title: event.title,
+                                      date: event.start,
+                                      joinURL: event.joinURL)
             menu.insertItem(row, at: headerIndex + 1 + offset)
             upcomingRows.append(row)
         }
@@ -306,9 +287,99 @@ final class StatusItemManager: NSObject {
         upcomingSeparator?.isHidden = false
     }
 
+    /// Builds a two-column row: title leading, time trailing (right-aligned via
+    /// a paragraph-style tab stop). Enabled when the event has a join URL.
+    private func makeUpcomingRow(title: String, date: Date, joinURL: URL?) -> NSMenuItem {
+        let cap = 28
+        let displayTitle = title.count > cap
+            ? title.prefix(cap - 1).trimmingCharacters(in: .whitespaces) + "…"
+            : title
+        let timeText = Self.formatUpcomingTime(date)
+
+        let para = NSMutableParagraphStyle()
+        para.firstLineHeadIndent = 12
+        para.headIndent = 12
+        para.tabStops = [NSTextTab(textAlignment: .right, location: 320, options: [:])]
+        para.lineBreakMode = .byTruncatingTail
+
+        let composed = "\(displayTitle)\t\(timeText)"
+        let attr = NSMutableAttributedString(string: composed)
+        let titleColor: NSColor = (joinURL != nil) ? .labelColor : .secondaryLabelColor
+        let full = NSRange(location: 0, length: attr.length)
+        attr.addAttributes([
+            .font: NSFont.menuFont(ofSize: 0),
+            .paragraphStyle: para,
+            .foregroundColor: titleColor
+        ], range: full)
+        // Time portion always uses the secondary label color.
+        if let tabIdx = composed.firstIndex(of: "\t") {
+            let after = composed.index(after: tabIdx)
+            let nsRange = NSRange(after..<composed.endIndex, in: composed)
+            attr.addAttribute(.foregroundColor,
+                              value: NSColor.secondaryLabelColor,
+                              range: nsRange)
+        }
+
+        let row: NSMenuItem
+        if let url = joinURL {
+            row = NSMenuItem(title: composed,
+                             action: #selector(joinFromMenuRow(_:)),
+                             keyEquivalent: "")
+            row.target = self
+            row.representedObject = url
+            row.toolTip = "Join \(title)"
+        } else {
+            row = NSMenuItem(title: composed, action: nil, keyEquivalent: "")
+            row.isEnabled = false
+        }
+        row.attributedTitle = attr
+        return row
+    }
+
     @objc private func joinFromMenuRow(_ sender: NSMenuItem) {
         if let url = sender.representedObject as? URL {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    // MARK: – Smart date formatting
+
+    private static let timeOnlyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.timeStyle = .short
+        f.dateStyle = .none
+        return f
+    }()
+
+    private static let weekdayTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("EEEjmm")
+        return f
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("MMMdjmm")
+        return f
+    }()
+
+    /// "2:30 PM" (today), "Tomorrow 9:00 AM", "Wed 9:00 AM" (within a week),
+    /// or "May 18, 9:00 AM" (further out).
+    private static func formatUpcomingTime(_ date: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) {
+            return timeOnlyFormatter.string(from: date)
+        }
+        if cal.isDateInTomorrow(date) {
+            return "Tomorrow \(timeOnlyFormatter.string(from: date))"
+        }
+        let now = Date()
+        let days = cal.dateComponents([.day],
+                                      from: cal.startOfDay(for: now),
+                                      to: cal.startOfDay(for: date)).day ?? 0
+        if days > 1 && days < 7 {
+            return weekdayTimeFormatter.string(from: date)
+        }
+        return shortDateFormatter.string(from: date)
     }
 }

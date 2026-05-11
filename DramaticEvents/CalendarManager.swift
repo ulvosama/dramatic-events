@@ -17,11 +17,14 @@ final class CalendarManager {
         fetchUpcomingEvents(limit: 1) { completion($0.first) }
     }
 
-    /// Returns up to `limit` non-all-day events starting in the next 24 hours,
-    /// ordered by start time (soonest first).
-    func fetchUpcomingEvents(limit: Int, completion: @escaping ([EKEvent]) -> Void) {
+    /// Returns up to `limit` non-all-day events starting in the future,
+    /// ordered by start time (soonest first). `withinHours` defines the
+    /// horizon (default 24 h).
+    func fetchUpcomingEvents(limit: Int,
+                             withinHours hours: Double = 24,
+                             completion: @escaping ([EKEvent]) -> Void) {
         let now = Date()
-        let end = now.addingTimeInterval(24 * 60 * 60)
+        let end = now.addingTimeInterval(hours * 3600)
         let cals = store.calendars(for: .event)
         let predicate = store.predicateForEvents(withStart: now, end: end,
                                                  calendars: cals.isEmpty ? nil : cals)

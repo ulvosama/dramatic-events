@@ -85,10 +85,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func refreshEvent() {
-        calendarManager.fetchUpcomingEvents(limit: 3) { [weak self] events in
+        // Fetch a 7-day window so the dropdown can show context further out
+        // ("Tomorrow", "Wed 9:00 AM", "May 18"). The menu-bar countdown only
+        // engages for events within the next 24 h.
+        calendarManager.fetchUpcomingEvents(limit: 3, withinHours: 24 * 7) { [weak self] events in
             DispatchQueue.main.async {
                 guard let self else { return }
-                let newEvent = events.first
+                let first = events.first
+                let firstIsImminent = (first?.startDate.timeIntervalSinceNow ?? .infinity) < 24 * 3600
+                let newEvent = firstIsImminent ? first : nil
                 // Reset per-event flags when the current event changes.
                 if newEvent?.eventIdentifier != self.currentEvent?.eventIdentifier {
                     self.notifiedLiveEventID = nil
