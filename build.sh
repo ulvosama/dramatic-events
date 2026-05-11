@@ -32,6 +32,8 @@ xcrun -sdk macosx swiftc \
     "$SRC_DIR/Settings.swift" \
     "$SRC_DIR/LoginItemHelper.swift" \
     "$SRC_DIR/UpdateChecker.swift" \
+    "$SRC_DIR/NotificationManager.swift" \
+    "$SRC_DIR/WelcomeWindowController.swift" \
     "$SRC_DIR/SettingsWindowController.swift" \
     "$SRC_DIR/EventLinkParser.swift" \
     "$SRC_DIR/AppDelegate.swift" \

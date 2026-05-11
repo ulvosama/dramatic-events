@@ -8,9 +8,31 @@ final class Settings {
 
     private let defaults = UserDefaults.standard
     private enum Key {
-        static let soundPath     = "soundPath"
-        static let trimStart     = "trimStart"
-        static let startupDrama  = "startupDrama"
+        static let soundPath              = "soundPath"
+        static let trimStart              = "trimStart"
+        static let startupDrama           = "startupDrama"
+        static let volume                 = "volume"
+        static let macOSNotifications     = "macOSNotifications"
+    }
+
+    /// Sound playback volume (0.0…1.0). Defaults to 1.0.
+    var volume: Double {
+        get {
+            if defaults.object(forKey: Key.volume) == nil { return 1.0 }
+            return defaults.double(forKey: Key.volume)
+        }
+        set { defaults.set(max(0, min(1, newValue)), forKey: Key.volume) }
+    }
+
+    /// When true, fires a macOS Notification Center alert when a meeting
+    /// goes live. Useful for users in fullscreen apps where the menu bar
+    /// is hidden. Defaults to true.
+    var macOSNotificationsEnabled: Bool {
+        get {
+            if defaults.object(forKey: Key.macOSNotifications) == nil { return true }
+            return defaults.bool(forKey: Key.macOSNotifications)
+        }
+        set { defaults.set(newValue, forKey: Key.macOSNotifications) }
     }
 
     /// When true, plays a 20-second dramatic sequence ("Going live in 10s…

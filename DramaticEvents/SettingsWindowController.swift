@@ -21,6 +21,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                                         target: nil, action: nil)
     private let dramaCheck   = NSButton(checkboxWithTitle: "Play startup drama",
                                         target: nil, action: nil)
+    private let testDramaBtn = NSButton(title: "Test drama now",
+                                        target: nil, action: nil)
+    private let notifyCheck  = NSButton(checkboxWithTitle: "Show macOS notification when a meeting starts",
+                                        target: nil, action: nil)
+
+    private let volumeSlider = NSSlider(value: 1, minValue: 0, maxValue: 1,
+                                        target: nil, action: nil)
+    private let volumeLabel  = NSTextField(labelWithString: "Volume")
 
     private let versionLabel = NSTextField(labelWithString: "")
     private let updateLabel  = NSTextField(labelWithString: "Checking for updates…")
@@ -37,6 +45,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private var previewStopper: Timer?
 
     private var keyMonitor: Any?
+
+    /// Set by AppDelegate. Triggered when the user clicks "Test drama now".
+    var onTestDrama: (() -> Void)?
 
     // MARK: – Init
 
@@ -153,6 +164,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         trimLabel.textColor = .secondaryLabelColor
         stack.addArrangedSubview(trimLabel)
 
+        volumeSlider.controlSize = .small
+        volumeSlider.target = self
+        volumeSlider.action = #selector(volumeChanged)
+        let vRow = NSStackView(views: [volumeLabel, volumeSlider])
+        vRow.alignment = .centerY
+        vRow.spacing = 10
+        volumeLabel.font = NSFont.systemFont(ofSize: 11)
+        volumeLabel.textColor = .secondaryLabelColor
+        let vWidth = volumeSlider.widthAnchor.constraint(equalToConstant: 380)
+        vWidth.priority = .defaultHigh
+        vWidth.isActive = true
+        stack.addArrangedSubview(vRow)
+
         stack.addArrangedSubview(divider())
 
         // — Startup —
@@ -163,8 +187,22 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         dramaCheck.target = self
         dramaCheck.action = #selector(dramaToggled)
-        dramaCheck.toolTip = "Play a 20-second \"Going live\" intro every time the app launches."
-        stack.addArrangedSubview(dramaCheck)
+        dramaCheck.toolTip = "Play a 13-second \"Going live\" intro every time the app launches."
+
+        testDramaBtn.target = self
+        testDramaBtn.action = #selector(testDramaTapped)
+        testDramaBtn.bezelStyle = .rounded
+        testDramaBtn.toolTip = "Trigger the startup drama right now."
+
+        let dramaRow = NSStackView(views: [dramaCheck, testDramaBtn])
+        dramaRow.spacing = 12
+        dramaRow.alignment = .centerY
+        stack.addArrangedSubview(dramaRow)
+
+        notifyCheck.target = self
+        notifyCheck.action = #selector(notifyToggled)
+        notifyCheck.toolTip = "Fires a macOS notification when a meeting goes live — useful in fullscreen apps."
+        stack.addArrangedSubview(notifyCheck)
 
         stack.addArrangedSubview(divider())
 
@@ -238,6 +276,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func dramaToggled() {
         Settings.shared.startupDramaEnabled = (dramaCheck.state == .on)
+    }
+
+    @objc private func notifyToggled() {
+        Settings.shared.macOSNotificationsEnabled = (notifyCheck.state == .on)
+    }
+
+    @objc private func testDramaTapped() {
+        onTestDrama?()
+    }
+
+    @objc private func volumeChanged() {
+        Settings.shared.volume = volumeSlider.doubleValue
     }
 
     // MARK: – Sound UI
@@ -325,7 +375,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         p.currentTime = start
         p.volume = 0
         p.play()
-        p.setVolume(1.0, fadeDuration: 2.0)
+        p.setVolume(Float(Settings.shared.volume), fadeDuration: 2.0)
         previewPlayer = p
         previewBtn.title = "■ Stop preview"
 
@@ -346,8 +396,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     // MARK: – Login UI
 
     private func refreshLoginUI() {
-        loginCheck.state = LoginItemHelper.isEnabled ? .on : .off
-        dramaCheck.state = Settings.shared.startupDramaEnabled ? .on : .off
+        loginCheck.state  = LoginItemHelper.isEnabled ? .on : .off
+        dramaCheck.state  = Settings.shared.startupDramaEnabled ? .on : .off
+        notifyCheck.state = Settings.shared.macOSNotificationsEnabled ? .on : .off
+        volumeSlider.doubleValue = Settings.shared.volume
     }
 
     @objc private func loginToggled() {

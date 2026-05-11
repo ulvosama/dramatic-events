@@ -11,12 +11,18 @@ final class StatusItemManager: NSObject {
     /// the title still has a leading inset, and overlay this view on top.
     private let iconView: NSImageView
     private let joinItem: NSMenuItem
+    private let skipItem: NSMenuItem
+    private let upcomingHeader: NSMenuItem
+    private var upcomingRows: [NSMenuItem] = []
+    private var upcomingSeparator: NSMenuItem?
     private var joinURL: URL?
     private var mode: AppearanceMode = .normal
 
     var onRefresh: (() -> Void)?
     var onOpenCalendar: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    /// Called with the new state (`true` = mute the next sound, `false` = un-mute).
+    var onSkipToggled: ((Bool) -> Void)?
 
     private static let urgentBackground = NSColor(
         red:   0xFF / 255.0,
@@ -55,10 +61,16 @@ final class StatusItemManager: NSObject {
         iconView.translatesAutoresizingMaskIntoConstraints = false
 
         joinItem = NSMenuItem(title: "Join", action: nil, keyEquivalent: "j")
+        skipItem = NSMenuItem(title: "Mute next event", action: nil, keyEquivalent: "")
+        upcomingHeader = NSMenuItem(title: "Upcoming", action: nil, keyEquivalent: "")
         super.init()
         joinItem.target = self
         joinItem.action = #selector(joinAction)
         joinItem.isHidden = true
+        skipItem.target = self
+        skipItem.action = #selector(skipAction)
+        skipItem.isHidden = true
+        upcomingHeader.isEnabled = false
         configureMenu()
         installIconView()
         applyChrome()
@@ -192,7 +204,15 @@ final class StatusItemManager: NSObject {
         menu.autoenablesItems = false
 
         menu.addItem(joinItem)
+        menu.addItem(skipItem)
         menu.addItem(.separator())
+
+        menu.addItem(upcomingHeader)
+        let sep = NSMenuItem.separator()
+        upcomingSeparator = sep
+        menu.addItem(sep)
+        upcomingHeader.isHidden = true
+        sep.isHidden = true
 
         let refresh = NSMenuItem(title: "Refresh",
                                  action: #selector(refreshAction),
@@ -227,6 +247,10 @@ final class StatusItemManager: NSObject {
     @objc private func joinAction() {
         if let url = joinURL { NSWorkspace.shared.open(url) }
     }
+    @objc private func skipAction() {
+        skipItem.state = (skipItem.state == .on) ? .off : .on
+        onSkipToggled?(skipItem.state == .on)
+    }
 
     func setJoin(label: String?, url: URL?) {
         if let label = label, let url = url {
@@ -238,5 +262,61 @@ final class StatusItemManager: NSObject {
             joinItem.isHidden = true
             joinURL = nil
         }
+    }
+
+    /// Configure the "Mute next event" toggle. Pass `nil` for `label` to hide
+    /// the item (no upcoming event to skip).
+    func setSkip(label: String?, isMuted: Bool) {
+        if let label = label {
+            skipItem.title = "Mute next: \(label)"
+            skipItem.state = isMuted ? .on : .off
+            skipItem.isHidden = false
+        } else {
+            skipItem.isHidden = true
+            skipItem.state = .off
+        }
+    }
+
+    /// Update the "Upcoming" section. Pass an empty array to hide the section.
+    func setUpcoming(_ events: [(title: String, start: Date)]) {
+        guard let menu = statusItem.menu else { return }
+
+        // Remove any previous rows we added.
+        for row in upcomingRows { menu.removeItem(row) }
+        upcomingRows.removeAll()
+
+        if events.isEmpty {
+            upcomingHeader.isHidden = true
+            upcomingSeparator?.isHidden = true
+            return
+        }
+
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+
+        // Insert new rows immediately after the header.
+        guard let headerIndex = menu.items.firstIndex(of: upcomingHeader) else { return }
+        for (offset, event) in events.enumerated() {
+            let cap = 35
+            let displayTitle = event.title.count > cap
+                ? event.title.prefix(cap - 1).trimmingCharacters(in: .whitespaces) + "…"
+                : event.title
+            let row = NSMenuItem(
+                title: "   \(displayTitle) — \(formatter.string(from: event.start))",
+                action: nil, keyEquivalent: "")
+            row.isEnabled = false
+            menu.insertItem(row, at: headerIndex + 1 + offset)
+            upcomingRows.append(row)
+        }
+
+        upcomingHeader.attributedTitle = NSAttributedString(
+            string: "UPCOMING",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
+                .foregroundColor: NSColor.secondaryLabelColor
+            ])
+        upcomingHeader.isHidden = false
+        upcomingSeparator?.isHidden = false
     }
 }

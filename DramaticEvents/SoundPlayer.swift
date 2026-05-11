@@ -39,7 +39,7 @@ final class SoundPlayer: NSObject, AVAudioPlayerDelegate {
             p.currentTime = start
             p.volume = 0
             p.play()
-            p.setVolume(1.0, fadeDuration: 2.0)
+            p.setVolume(Float(Settings.shared.volume), fadeDuration: 2.0)
             player = p
 
             // Schedule the fade-out 1 s before the hard stop so the tail
