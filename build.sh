@@ -39,6 +39,7 @@ xcrun -sdk macosx swiftc \
     "$SRC_DIR/AppDelegate.swift" \
     "$SRC_DIR/StatusItemManager.swift" \
     "$SRC_DIR/CalendarManager.swift" \
+    "$SRC_DIR/MeetingPresenceDetector.swift" \
     "$SRC_DIR/SoundPlayer.swift"
 
 echo "▶ Copying Info.plist + resources"

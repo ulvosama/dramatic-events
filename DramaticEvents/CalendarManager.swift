@@ -33,4 +33,29 @@ final class CalendarManager {
             .sorted { $0.startDate < $1.startDate }
         completion(Array(events.prefix(limit)))
     }
+
+    /// True if any non-all-day event is currently in progress
+    /// (started ≤ now, ends > now). Looks back 24 h so a long meeting that
+    /// began earlier today is still caught.
+    func isAnyEventInProgress() -> Bool {
+        let now = Date()
+        let cals = store.calendars(for: .event)
+        let predicate = store.predicateForEvents(
+            withStart: now.addingTimeInterval(-24 * 3600),
+            end: now,
+            calendars: cals.isEmpty ? nil : cals)
+        return store.events(matching: predicate).contains { event in
+            !event.isAllDay
+                && event.startDate <= now
+                && event.endDate > now
+        }
+    }
+
+    /// Asks EventKit to pull from remote sources (iCloud CalDAV, etc.) so
+    /// freshly-added events show up. No completion handler is exposed by the
+    /// system API — callers should listen for `.EKEventStoreChanged` or rely
+    /// on a timeout.
+    func forceSync() {
+        store.refreshSourcesIfNecessary()
+    }
 }

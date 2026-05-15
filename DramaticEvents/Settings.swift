@@ -13,6 +13,7 @@ final class Settings {
         static let startupDrama           = "startupDrama"
         static let volume                 = "volume"
         static let macOSNotifications     = "macOSNotifications"
+        static let suppressWhenInMeeting  = "suppressWhenInMeeting"
     }
 
     /// Sound playback volume (0.0…1.0). Defaults to 1.0.
@@ -22,6 +23,18 @@ final class Settings {
             return defaults.double(forKey: Key.volume)
         }
         set { defaults.set(max(0, min(1, newValue)), forKey: Key.volume) }
+    }
+
+    /// When true, the dramatic sound is skipped if [[MeetingPresenceDetector]]
+    /// thinks the user is already in another meeting (overlapping calendar
+    /// event, in-call app subprocess, or Focus / DND on). The visual urgent
+    /// state still fires either way. Defaults to true.
+    var suppressSoundWhenInMeeting: Bool {
+        get {
+            if defaults.object(forKey: Key.suppressWhenInMeeting) == nil { return true }
+            return defaults.bool(forKey: Key.suppressWhenInMeeting)
+        }
+        set { defaults.set(newValue, forKey: Key.suppressWhenInMeeting) }
     }
 
     /// When true, fires a macOS Notification Center alert when a meeting

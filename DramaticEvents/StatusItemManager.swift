@@ -11,6 +11,7 @@ final class StatusItemManager: NSObject {
     /// the title still has a leading inset, and overlay this view on top.
     private let iconView: NSImageView
     private let joinItem: NSMenuItem
+    private let refreshItem: NSMenuItem
     private let upcomingHeader: NSMenuItem
     private var upcomingRows: [NSMenuItem] = []
     private var upcomingSeparator: NSMenuItem?
@@ -58,11 +59,14 @@ final class StatusItemManager: NSObject {
         iconView.translatesAutoresizingMaskIntoConstraints = false
 
         joinItem = NSMenuItem(title: "Join", action: nil, keyEquivalent: "j")
+        refreshItem = NSMenuItem(title: "Refresh", action: nil, keyEquivalent: "r")
         upcomingHeader = NSMenuItem(title: "Upcoming", action: nil, keyEquivalent: "")
         super.init()
         joinItem.target = self
         joinItem.action = #selector(joinAction)
         joinItem.isHidden = true
+        refreshItem.target = self
+        refreshItem.action = #selector(refreshAction)
         upcomingHeader.isEnabled = false
         configureMenu()
         installIconView()
@@ -206,11 +210,7 @@ final class StatusItemManager: NSObject {
         upcomingHeader.isHidden = true
         sep.isHidden = true
 
-        let refresh = NSMenuItem(title: "Refresh",
-                                 action: #selector(refreshAction),
-                                 keyEquivalent: "r")
-        refresh.target = self
-        menu.addItem(refresh)
+        menu.addItem(refreshItem)
 
         let open = NSMenuItem(title: "Open Calendar",
                               action: #selector(openCalendarAction),
@@ -236,6 +236,14 @@ final class StatusItemManager: NSObject {
     @objc private func refreshAction()      { onRefresh?() }
     @objc private func openCalendarAction() { onOpenCalendar?() }
     @objc private func openSettingsAction() { onOpenSettings?() }
+
+    /// Reflects the in-flight state of a user-initiated force-sync. While
+    /// loading, the menu item is disabled so a second click can't fire a
+    /// duplicate sync.
+    func setRefreshLoading(_ loading: Bool) {
+        refreshItem.title = loading ? "Loading…" : "Refresh"
+        refreshItem.isEnabled = !loading
+    }
     @objc private func joinAction() {
         if let url = joinURL { NSWorkspace.shared.open(url) }
     }

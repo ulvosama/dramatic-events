@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemManager: StatusItemManager!
     private let calendarManager = CalendarManager()
     private let soundPlayer = SoundPlayer()
+    private lazy var presenceDetector = MeetingPresenceDetector(calendarManager: calendarManager)
 
     private var timer: Timer?
     private var currentEvent: EKEvent?
@@ -23,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             reason: "Live countdown to next calendar event")
 
         statusItemManager = StatusItemManager()
-        statusItemManager.onRefresh      = { [weak self] in self?.refreshEvent() }
+        statusItemManager.onRefresh      = { [weak self] in self?.userInitiatedRefresh() }
         statusItemManager.onOpenCalendar = {
             if let url = URL(string: "ical://") { NSWorkspace.shared.open(url) }
         }
@@ -101,7 +102,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.currentEvent = newEvent
                 self.updateDropdownMenu(for: events)
                 self.tick()
+                // Idempotent: if we weren't loading, this is a visual no-op.
+                self.statusItemManager.setRefreshLoading(false)
             }
+        }
+    }
+
+    /// User clicked Refresh in the dropdown. Asks EventKit to pull from
+    /// remote sources, re-renders from cache for instant feedback, and shows
+    /// a `Loading…` state on the menu item. `refreshSourcesIfNecessary` has
+    /// no completion handler — we listen for `.EKEventStoreChanged` (already
+    /// wired) and additionally cap the loading state at 2 s in case the sync
+    /// is silent.
+    private func userInitiatedRefresh() {
+        statusItemManager.setRefreshLoading(true)
+        calendarManager.forceSync()
+        refreshEvent()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.statusItemManager.setRefreshLoading(false)
         }
     }
 
@@ -138,8 +156,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startStartupDrama() {
         dramaStartTime = Date()
-        soundPlayer.playMeetingSound()
+        playSoundIfNotInMeeting()
         tick()      // render "Going live in 10s" right away
+    }
+
+    /// Gate for [[soundPlayer.playMeetingSound]] — skips audio when the user
+    /// appears to already be in a meeting. Visual chrome is unaffected.
+    private func playSoundIfNotInMeeting() {
+        if Settings.shared.suppressSoundWhenInMeeting,
+           presenceDetector.isLikelyInMeeting() {
+            NSLog("Sound suppressed: user appears to be in a meeting")
+            return
+        }
+        soundPlayer.playMeetingSound()
     }
 
     private func dramaPhase() -> DramaPhase? {
@@ -195,7 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Sound + urgent visual fire together at T-10s.
             if secondsLeft <= 10, soundStartedForEventID != id {
                 soundStartedForEventID = id
-                soundPlayer.playMeetingSound()
+                playSoundIfNotInMeeting()
             }
         } else if interval >= -60 {
             // Live state — first 60 s of the event. Solid red, no flash.

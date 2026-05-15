@@ -25,6 +25,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                                         target: nil, action: nil)
     private let notifyCheck  = NSButton(checkboxWithTitle: "Show macOS notification when a meeting starts",
                                         target: nil, action: nil)
+    private let suppressCheck = NSButton(checkboxWithTitle: "Skip sound when you're already in another meeting",
+                                         target: nil, action: nil)
 
     private let volumeSlider  = NSSlider(value: 1, minValue: 0, maxValue: 1,
                                          target: nil, action: nil)
@@ -183,6 +185,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         vWidth.isActive = true
         stack.addArrangedSubview(vRow)
 
+        suppressCheck.target = self
+        suppressCheck.action = #selector(suppressToggled)
+        suppressCheck.toolTip = "Suppresses the sound when a calendar event is in progress, a Zoom/Webex meeting is active, or Focus / Do Not Disturb is on."
+        stack.addArrangedSubview(suppressCheck)
+
         stack.addArrangedSubview(divider())
 
         // — Startup —
@@ -286,6 +293,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func notifyToggled() {
         Settings.shared.macOSNotificationsEnabled = (notifyCheck.state == .on)
+    }
+
+    @objc private func suppressToggled() {
+        Settings.shared.suppressSoundWhenInMeeting = (suppressCheck.state == .on)
     }
 
     @objc private func testDramaTapped() {
@@ -407,9 +418,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     // MARK: – Login UI
 
     private func refreshLoginUI() {
-        loginCheck.state  = LoginItemHelper.isEnabled ? .on : .off
-        dramaCheck.state  = Settings.shared.startupDramaEnabled ? .on : .off
-        notifyCheck.state = Settings.shared.macOSNotificationsEnabled ? .on : .off
+        loginCheck.state    = LoginItemHelper.isEnabled ? .on : .off
+        dramaCheck.state    = Settings.shared.startupDramaEnabled ? .on : .off
+        notifyCheck.state   = Settings.shared.macOSNotificationsEnabled ? .on : .off
+        suppressCheck.state = Settings.shared.suppressSoundWhenInMeeting ? .on : .off
         volumeSlider.doubleValue = Settings.shared.volume
         refreshVolumeLabel()
     }
