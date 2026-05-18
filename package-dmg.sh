@@ -16,8 +16,10 @@ APP_NAME="Dramatic Events"
 APP_BUNDLE="build/$APP_NAME.app"
 VOL_NAME="Drag Dramatic Events to Applications"
 DMG_NAME="Dramatic-Events.dmg"
+ZIP_NAME="Dramatic-Events.zip"
 RW_DMG="build/dmg-rw.dmg"
 FINAL_DMG="build/$DMG_NAME"
+FINAL_ZIP="build/$ZIP_NAME"
 
 ./build.sh
 
@@ -91,9 +93,16 @@ echo "▶ Converting to compressed read-only DMG"
 hdiutil convert "$RW_DMG" -format UDZO -imagekey zlib-level=9 -o "$FINAL_DMG" >/dev/null
 rm -f "$RW_DMG"
 
-echo "✓ Built: $FINAL_DMG (v$VERSION)"
+# The in-app silent updater downloads this .zip (not the DMG) and swaps the
+# bundle in place. `ditto --keepParent` preserves the code signature and nests
+# the archive under "Dramatic Events.app" so it expands cleanly.
+echo "▶ Zipping app for the in-app updater"
+rm -f "$FINAL_ZIP"
+ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$FINAL_ZIP"
+
+echo "✓ Built: $FINAL_DMG + $FINAL_ZIP (v$VERSION)"
 echo
-echo "Publish the release with:"
-echo "  gh release create v$VERSION '$FINAL_DMG' \\"
+echo "Publish the release with (upload BOTH assets):"
+echo "  gh release create v$VERSION '$FINAL_DMG' '$FINAL_ZIP' \\"
 echo "    --title 'Dramatic Events v$VERSION' \\"
 echo "    --notes 'Release notes here.'"

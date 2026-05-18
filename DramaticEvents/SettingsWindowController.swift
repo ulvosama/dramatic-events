@@ -447,6 +447,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         updateLabel.stringValue = "Checking for updates…"
         updateLabel.textColor = .secondaryLabelColor
         updateButton.isEnabled = false
+        updateButton.isHidden = false
         updateButton.title = "Check for updates"
         pendingDownloadURL = nil
         pendingPageURL = nil
@@ -461,11 +462,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                     self.updateLabel.textColor = .secondaryLabelColor
                     self.updateButton.title = "Check for updates"
                 case .updateAvailable(let r):
-                    self.updateLabel.stringValue = "Update available — v\(r.version)"
-                    self.updateLabel.textColor = .systemOrange
-                    self.updateButton.title = "Download v\(r.version)"
-                    self.pendingDownloadURL = r.downloadURL
-                    self.pendingPageURL = r.pageURL
+                    self.presentUpdateAvailable(r)
                 case .failed(let err):
                     self.updateLabel.stringValue = "Couldn't reach update server: \(err.localizedDescription)"
                     self.updateLabel.textColor = .systemRed
@@ -473,6 +470,46 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 }
             }
         }
+    }
+
+    /// An update is available. The silent updater downloads and stages it in
+    /// the background; we just reflect progress here. If the release has no
+    /// `.zip` asset (or staging fails), we fall back to the manual download.
+    private func presentUpdateAvailable(_ r: UpdateChecker.LatestRelease) {
+        guard let zip = r.zipURL else {
+            showManualDownload(r)
+            return
+        }
+        if Updater.hasPendingUpdate(), Settings.shared.pendingUpdateVersion == r.version {
+            showUpdateReady(version: r.version)
+            return
+        }
+        updateLabel.stringValue = "Downloading update — v\(r.version)…"
+        updateLabel.textColor = .secondaryLabelColor
+        updateButton.isHidden = true
+        Updater.stageUpdate(zipURL: zip, version: r.version) { [weak self] ok in
+            guard let self else { return }
+            if ok {
+                self.showUpdateReady(version: r.version)
+            } else {
+                self.showManualDownload(r)
+            }
+        }
+    }
+
+    private func showUpdateReady(version: String) {
+        updateLabel.stringValue = "Update v\(version) ready — it installs automatically the next time you quit Dramatic Events."
+        updateLabel.textColor = .systemGreen
+        updateButton.isHidden = true
+    }
+
+    private func showManualDownload(_ r: UpdateChecker.LatestRelease) {
+        updateLabel.stringValue = "Update available — v\(r.version)"
+        updateLabel.textColor = .systemOrange
+        updateButton.isHidden = false
+        updateButton.title = "Download v\(r.version)"
+        pendingDownloadURL = r.downloadURL
+        pendingPageURL = r.pageURL
     }
 
     @objc private func updateButtonTapped() {

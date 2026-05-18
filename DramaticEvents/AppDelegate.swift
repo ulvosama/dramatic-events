@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var presenceDetector = MeetingPresenceDetector(calendarManager: calendarManager)
 
     private var timer: Timer?
+    private var updateCheckTimer: Timer?
     private var currentEvent: EKEvent?
     private var soundStartedForEventID: String?
     private var notifiedLiveEventID: String?
@@ -37,6 +38,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemManager.showText("Loading…")
 
         NotificationManager.requestAuthorization()
+
+        // Discard staging state if a previous quit already swapped the update in.
+        Updater.clearStagingIfInstalled()
+        // Look for a new release now, then every 6 hours. When one is found,
+        // its zipped .app is downloaded and staged for a silent install on quit.
+        scheduleUpdateChecks()
 
         // First launch UX: show a welcome explainer if Calendar permission
         // hasn't been decided yet. Otherwise proceed straight to the system
@@ -254,5 +261,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
         return "\(hours):\(String(format: "%02d", minutes))"
+    }
+
+    // MARK: – Silent updates
+
+    private func scheduleUpdateChecks() {
+        checkForUpdateInBackground()
+        let t = Timer(timeInterval: 6 * 3600, repeats: true) { [weak self] _ in
+            self?.checkForUpdateInBackground()
+        }
+        RunLoop.main.add(t, forMode: .common)
+        updateCheckTimer = t
+    }
+
+    /// Asks GitHub for the latest release; if it's newer and ships a `.zip`
+    /// asset, hands it to `Updater` to download and stage. The actual swap
+    /// happens in `applicationWillTerminate`.
+    private func checkForUpdateInBackground() {
+        UpdateChecker.check { result in
+            guard case .updateAvailable(let release) = result,
+                  let zip = release.zipURL else { return }
+            Updater.stageUpdate(zipURL: zip, version: release.version) { _ in }
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        Updater.installPendingUpdateOnQuit()
     }
 }

@@ -31,12 +31,30 @@ The app has an `UpdateChecker` that hits the GitHub Releases API whenever the us
 GET https://api.github.com/repos/ulvosama/dramatic-events/releases/latest
 ```
 
-It reads the response's `tag_name`, strips a leading `v` if present, and compares with the local `CFBundleShortVersionString`. If the remote tag is newer, the Settings panel shows:
+It reads the response's `tag_name`, strips a leading `v` if present, and compares with the local `CFBundleShortVersionString`.
 
-> **Update available — v1.0.1**
-> [ Download v1.0.1 ]
+### Silent updates (v1.3.0+)
 
-Clicking Download opens the DMG asset URL in Safari. The user drags the new app over the old one in `/Applications`.
+If the remote tag is newer **and** the release carries a `Dramatic-Events.zip`
+asset, the app updates itself with no user action:
+
+1. `Updater` downloads the `.zip`, unpacks it with `ditto`, and strips the
+   `com.apple.quarantine` xattr — so the swapped-in bundle launches without a
+   Gatekeeper prompt even though it's only ad-hoc signed.
+2. The unpacked bundle is staged in `~/Library/Application Support/Dramatic Events/Update/`.
+3. On the next quit, a detached helper waits for the app to exit, then swaps
+   the bundle in place. No DMG, no drag, no relaunch — the new version is just
+   there next time the app opens.
+
+The Settings panel shows "Update v1.3.0 ready — installs automatically the
+next time you quit". If the release has **no** `.zip` asset, or staging fails,
+it falls back to the old manual flow: a `[ Download ]` button that opens the
+DMG so the user drags the app into `/Applications` themselves.
+
+> **This means every release from v1.3.0 onward MUST include the `.zip`
+> asset** — `package-dmg.sh` builds it; just remember to upload it (step 4).
+> The first version a user runs that has the updater (v1.3.0) still has to be
+> installed manually once; updates after that are silent.
 
 The user-facing direct-download link is **stable across versions**:
 
@@ -71,6 +89,7 @@ This:
 1. Calls `./build.sh` which compiles all Swift sources into `build/Dramatic Events.app` and ad-hoc signs it.
 2. Stages the .app + an `Applications` symlink into a temp folder.
 3. Runs `hdiutil create … -format UDZO` to produce `build/Dramatic-Events.dmg`.
+4. Runs `ditto -c -k --keepParent` to produce `build/Dramatic-Events.zip` — the asset the in-app updater downloads.
 
 ### 3. Commit and tag
 
@@ -84,8 +103,10 @@ The tag must start with `v` and exactly match the version string. The app's upda
 
 ### 4. Create the GitHub release
 
+Upload **both** the DMG and the ZIP — the ZIP is what the silent updater pulls:
+
 ```bash
-gh release create v1.0.1 'build/Dramatic-Events.dmg' \
+gh release create v1.0.1 'build/Dramatic-Events.dmg' 'build/Dramatic-Events.zip' \
     --title "Dramatic Events v1.0.1" \
     --notes "$(cat <<'EOF'
 - Fixed: countdown jitter on Retina displays
@@ -95,7 +116,9 @@ EOF
 )"
 ```
 
-That's it. Every running copy of the app, the next time the user opens **Settings…**, will see the new version and a Download button.
+That's it. Every running copy of the app (v1.3.0+) will detect the release
+within 6 hours — or immediately when the user opens **Settings…** — download
+the ZIP, and silently install it on the next quit.
 
 ### 5. (Optional) Verify
 
@@ -139,8 +162,9 @@ Not worth it for sharing with friends.
 ```
 DramaticEvents/Info.plist          ← bump version here
 DramaticEvents/UpdateChecker.swift  ← repo owner/name baked in
+DramaticEvents/Updater.swift        ← silent download/stage/install-on-quit
 build.sh                            ← compile + sign
-package-dmg.sh                      ← package
+package-dmg.sh                      ← package (DMG + ZIP)
 ```
 
 If you ever rename the GitHub repo, also update the constants at the top of `UpdateChecker.swift`:

@@ -10,6 +10,7 @@ enum UpdateChecker {
     struct LatestRelease {
         let version: String          // e.g. "1.0.1" (no "v" prefix)
         let downloadURL: URL?        // first .dmg asset, if any
+        let zipURL: URL?             // first .zip asset — used by the silent updater
         let pageURL: URL             // GitHub release page
     }
 
@@ -49,10 +50,13 @@ enum UpdateChecker {
                     ? String(resp.tagName.dropFirst())
                     : resp.tagName
                 let dmg = resp.assets.first { $0.name.lowercased().hasSuffix(".dmg") }
+                let zip = resp.assets.first { $0.name.lowercased().hasSuffix(".zip") }
                 let downloadURL = dmg.flatMap { URL(string: $0.browserDownloadUrl) }
+                let zipURL = zip.flatMap { URL(string: $0.browserDownloadUrl) }
                 let pageURL = URL(string: resp.htmlUrl) ?? url
                 let release = LatestRelease(version: version,
                                             downloadURL: downloadURL,
+                                            zipURL: zipURL,
                                             pageURL: pageURL)
                 if isNewer(version, than: currentVersion) {
                     completion(.updateAvailable(release))

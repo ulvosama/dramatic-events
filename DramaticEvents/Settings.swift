@@ -14,6 +14,14 @@ final class Settings {
         static let volume                 = "volume"
         static let macOSNotifications     = "macOSNotifications"
         static let suppressWhenInMeeting  = "suppressWhenInMeeting"
+        static let pendingUpdate          = "pendingUpdateVersion"
+    }
+
+    /// Version string of an update that [[Updater]] has downloaded and staged,
+    /// waiting to be swapped in on next quit. `nil` when nothing is pending.
+    var pendingUpdateVersion: String? {
+        get { defaults.string(forKey: Key.pendingUpdate) }
+        set { defaults.set(newValue, forKey: Key.pendingUpdate) }
     }
 
     /// Sound playback volume (0.0…1.0). Defaults to 1.0.
